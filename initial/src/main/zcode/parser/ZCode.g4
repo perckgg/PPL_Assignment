@@ -9,59 +9,118 @@ options {
 	language=Python3;
 }
 
-program: EOF ;
+program: declaration_list EOF ;
+
 //DECLARATIONS
+declaration_list: declaration declaration_list | declaration;
 declaration: variable_decl | function_decl;
-variable_decl:  (NUMBER| STRING| BOOL) IDENTIFIER (COMMA IDENTIFIER)*| var_decl| dyna_decl;
+
+// VARIABLE DECLARATION
+variable_decl:  var_type index_list array_decl NEWLINE* | var_decl NEWLINE*;
+index_list: IDENTIFIER COMMA index_list| IDENTIFIER| expr COMMA index_list| expr;
+array_decl: ASS array_type | ;
 var_decl: VAR IDENTIFIER ASS expr;
-dyna_decl: DYNAMIC IDENTIFIER;
-function_decl: FUNC IDENTIFIER LR NUMBER RR;
+
+//parameter
+para_decl: var_type IDENTIFIER array_decl;
+
+//function
+function_decl: FUNC func_head func_body;
+func_head: IDENTIFIER LR para_decl_list RR;
+para_decl_list: para_decl COMMA para_decl_list| para_decl | ;
+func_body: NEWLINE* block_stmt NEWLINE*|;
+
+//STATEMENT
+statement: if_stmt | match_stmt | unmatch_stmt ;
+if_stmt: IF expr NEWLINE* statement elif_stmt else_stmt;
+elif_stmt: ELIF expr NEWLINE* statement elif_stmt | ;
+else_stmt: NEWLINE* ELSE NEWLINE* statement| ;
+match_stmt: IF expr NEWLINE* match_stmt NEWLINE* (ELIF expr NEWLINE* match_stmt NEWLINE* )*   ELSE NEWLINE* match_stmt  
+	|ass_stmt
+	|if_stmt
+	|for_stmt
+	|break_stmt
+	|continue_stmt
+	|return_stmt
+	|call_stmt
+	|block_stmt;
+unmatch_stmt: IF expr NEWLINE* statement 
+			| IF expr NEWLINE* match_stmt (ELIF expr NEWLINE* match_stmt NEWLINE* )* ELSE NEWLINE* unmatch_stmt;
+
+//assignment
+ass_stmt: lhs ASS expr;	 
+lhs: IDENTIFIER | index_expr | func_call_expr |variable_decl ;
+
+//for
+for_stmt: FOR IDENTIFIER UNTIL expr BY expr NEWLINE+ statement;
+//break
+break_stmt: BREAK;
+//Continue
+continue_stmt: CONTINUE ;
+//Function
+call_stmt: func_call_expr ;
+//Block
+block_stmt: BEGIN NEWLINE+ stodl_list END NEWLINE+| NEWLINE* return_stmt NEWLINE*;
+stodl: statement | variable_decl | expr;
+stodl_list: stodl NEWLINE* stodl_list | ;
+
+//return
+return_stmt: RETURN expr;
+
 
 //Expression
-
-expr: expr0;
-expr_list: exprsimple | ;
-exprsimple: expr COMMA exprsimple | expr;
-
-expr0 : expr1 CONC expr1 | expr1;
+expr:  expr0;
+expr0 : expr1 CONC expr1 | expr1; 
 expr1 : expr2 (EQ| EQEQ | NEQ | LT | GT | LTE | GTE) expr2 | expr2;
 expr2 : expr2 (AND | OR) expr3 | expr3;
 expr3 : expr3 (ADD | MINUS) expr4 | expr4;
 expr4 : expr4 (MUL | DIV | MOD) expr5 | expr5;
 expr5 : NOT expr5 | expr6;
 expr6 : MINUS expr6 | expr7;
-
-expr7: IDENTIFIER | constant | func_call_expr | index_expr | sub_expr;
-
-constant: NUMBERLIT | BOOLEANLIT | STRINGLIT;
-
-func_call_expr: IDENTIFIER LR expr_list RR;
+expr7: IDENTIFIER | constant | func_call_expr | index_expr|sub_expr;
 
 sub_expr: LR expr RR;
+constant: NUMBERLIT | BOOLEANLIT | STRINGLIT;
+
+func_call_expr: IDENTIFIER LR (expr_list| ) RR;
+expr_list: exprprime |;
+exprprime: expr COMMA exprprime | expr;
+
+index_expr: IDENTIFIER index_operator;
 
 index_operator: LS index_operators RS;
 
-index_operators: NUMBERLIT | NUMBERLIT COMMA index_operators;
+index_operators:  num_id COMMA index_operators| num_id ;
+num_id: NUMBERLIT | IDENTIFIER | expr;
 
-index_expr: (IDENTIFIER | func_call_expr) index_operator;
 
 //TYPE
-DATATYPE: PRIMITIVE | ARRAY;
-PRIMITIVE: NUMBER | BOOL | STRING;
-ARRAY : PRIMITIVE DIMENSION '<-' LS ARRAY_VALUES RS;
-fragment DIMENSION: LS DIGIT (COMMA DIGIT)* RS;
-fragment ARRAY_VALUES: LS (PRIMITIVE | ARRAY_VALUES) (COMMA (PRIMITIVE | ARRAY_VALUES))* RS;
+var_type: var_prime | array_type| dynamic_type;
+var_prime: NUMBER | BOOL | STRING;
+dynamic_type: DYNAMIC;
+array_type : LS array_lit RS;
+array_lit: constant COMMA array_lit | constant;
+
 
 // LITERAL
-BOOLEANLIT: 'TRUE' | 'FALSE';
-NUMBERLIT: '-'?DIGIT+(.DIGIT*)?([eE] [+-]? DIGIT+)? ;
-fragment DIGIT: [0-9]+;
+BOOLEANLIT: TRUE | FALSE;
+NUMBERLIT: INT('.'DEC)?(EXP)?;
+fragment INT: DIGIT+;
+fragment DEC: DIGIT* ;
+fragment EXP: [eE] [+-]? DIGIT+;  
+fragment DIGIT: [0-9];
 
-STRINGLIT:
-	'"' (NON_ESC | ESC)* '"' {self.text = self.text[1:-1]};
-fragment NON_ESC: ~[\n'\r"];
-fragment ESC: '\\' [bfrnt'"\\];
-fragment ILL_ESC: '\\' ~[bfrnt'"\\];
+STRINGLIT : '"' (NON_ESC | ESC | DOUBLE_QUOTE)* '"' {self.text = self.text[1:-1]};
+fragment ESC: '\\b'
+			| '\\t'
+			| '\\n'
+			| '\\f'
+			| '\\r'
+			| '\\\''
+			| '\\\\';
+fragment NON_ESC : ~[\n\r"\\];			
+fragment ILL_ESC : '\\' ~[bfrnt'\\];
+fragment DOUBLE_QUOTE : '\'"'; 
 
 
 
@@ -85,15 +144,16 @@ ELSE: 'else';
 ELIF: 'elif';
 BEGIN: 'begin';
 END: 'end';
-NOT: '!'| 'not';
-AND: '&&'| 'and';
-OR: '||'| 'or';
+NOT:  'not';
+AND: 'and';
+OR:  'or';
 
 //COMMENT
-COMMENT : '##' .*? '\n';
+COMMENT : '##' .*? '\n'-> skip;
 
 
 //OPERATOR
+ASS: '<-';
 MUL: '*';
 DIV: '/';
 ADD: '+';
@@ -101,29 +161,29 @@ MINUS: '-';
 MOD: '%';
 LTE: '<=';
 GTE: '>=';
-EQ: '=';
 NEQ: '!=';
-ASS: '<-';
 LT : '<' ;
 GT : '>' ;
 CONC: '...';
 EQEQ: '==';
-
+EQ: '=';
 //SEPARATORS
 LR: '(';
 RR: ')';
 LS: '[';
 RS: ']';
 COMMA: ',';
-
+NEWLINE: '\n' | '\r' | '\r\n';
 //IDENTIFIER
 IDENTIFIER : [a-zA-Z_] [0-9a-zA-Z_]*;
 
-WS : [ \t\r\n]+ -> skip ; // skip spaces, tabs, newlines
 
-UNCLOSE_STRING:
-	'"' (NON_ESC | ESC)* {raise UncloseString(self.text[1:])};
-ILLEGAL_ESCAPE:
-	'"' (NON_ESC | ESC)* ILL_ESC { raise IllegalEscape(self.text[1:])};
+WS : [ \t\b\f]+ -> skip ; // skip spaces, tabs, newlines
 
+UNCLOSE_STRING:'"' (NON_ESC | ESC)* (EOF | [\n\r]) {
+	raise UncloseString(self.text[1:].replace('\n','').replace('\r',''))
+};
+ILLEGAL_ESCAPE:'"' (NON_ESC | ESC)* ILL_ESC { 
+	raise IllegalEscape(self.text[1:])
+};
 ERROR_CHAR: . {raise ErrorToken(self.text)};
