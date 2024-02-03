@@ -16,10 +16,12 @@ declaration_list: declaration declaration_list | declaration;
 declaration: variable_decl | function_decl;
 
 // VARIABLE DECLARATION
-variable_decl:  var_type index_list array_decl NEWLINE* | var_decl NEWLINE*;
+variable_decl:  var_type index_list sign_decl array_decl NEWLINE* | var_decl NEWLINE*| dyna_decl NEWLINE*;
 index_list: IDENTIFIER COMMA index_list| IDENTIFIER| expr COMMA index_list| expr;
-array_decl: ASS array_type | ;
+array_decl:  array_type | ;
 var_decl: VAR IDENTIFIER ASS expr;
+sign_decl: ASS | EQ |;
+dyna_decl: dynamic_type sign_decl ( expr | ) ;
 
 //parameter
 para_decl: var_type IDENTIFIER array_decl;
@@ -28,15 +30,14 @@ para_decl: var_type IDENTIFIER array_decl;
 function_decl: FUNC func_head func_body;
 func_head: IDENTIFIER LR para_decl_list RR;
 para_decl_list: para_decl COMMA para_decl_list| para_decl | ;
-func_body: NEWLINE* block_stmt NEWLINE*|;
+func_body: NEWLINE* block_stmt NEWLINE*| NEWLINE* RETURN expr NEWLINE* |;
 
 //STATEMENT
-statement: if_stmt | match_stmt | unmatch_stmt ;
-if_stmt: IF expr NEWLINE* statement elif_stmt else_stmt;
-elif_stmt: ELIF expr NEWLINE* statement elif_stmt | ;
-else_stmt: NEWLINE* ELSE NEWLINE* statement| ;
-match_stmt: IF expr NEWLINE* match_stmt NEWLINE* (ELIF expr NEWLINE* match_stmt NEWLINE* )*   ELSE NEWLINE* match_stmt  
-	|ass_stmt
+statement: if_stmt | normal_stmt;
+if_stmt: IF expr NEWLINE* statement NEWLINE* elif_stmt else_stmt;
+elif_stmt: ELIF expr NEWLINE* statement NEWLINE* elif_stmt | ;
+else_stmt: NEWLINE* ELSE NEWLINE* statement | ;
+normal_stmt: ass_stmt
 	|if_stmt
 	|for_stmt
 	|break_stmt
@@ -44,28 +45,27 @@ match_stmt: IF expr NEWLINE* match_stmt NEWLINE* (ELIF expr NEWLINE* match_stmt 
 	|return_stmt
 	|call_stmt
 	|block_stmt;
-unmatch_stmt: IF expr NEWLINE* statement 
-			| IF expr NEWLINE* match_stmt (ELIF expr NEWLINE* match_stmt NEWLINE* )* ELSE NEWLINE* unmatch_stmt;
+
 
 //assignment
-ass_stmt: lhs ASS expr;	 
+ass_stmt: lhs ASS expr NEWLINE+ ;	 
 lhs: IDENTIFIER | index_expr | func_call_expr |variable_decl ;
 
 //for
-for_stmt: FOR IDENTIFIER UNTIL expr BY expr NEWLINE+ statement;
+for_stmt: FOR IDENTIFIER UNTIL expr BY expr NEWLINE* statement NEWLINE*;
 //break
-break_stmt: BREAK;
+break_stmt: BREAK NEWLINE+;
 //Continue
-continue_stmt: CONTINUE ;
+continue_stmt: CONTINUE NEWLINE+;
 //Function
-call_stmt: func_call_expr ;
+call_stmt: func_call_expr NEWLINE+;
 //Block
-block_stmt: BEGIN NEWLINE+ stodl_list END NEWLINE+| NEWLINE* return_stmt NEWLINE*;
-stodl: statement | variable_decl | expr;
-stodl_list: stodl NEWLINE* stodl_list | ;
+block_stmt: BEGIN NEWLINE+ stodl_list END NEWLINE+;
+stodl: statement | (variable_decl NEWLINE+) | (expr NEWLINE*);
+stodl_list: stodl stodl_list | ;
 
 //return
-return_stmt: RETURN expr;
+return_stmt: RETURN expr NEWLINE+;
 
 
 //Expression
@@ -95,11 +95,11 @@ num_id: NUMBERLIT | IDENTIFIER | expr;
 
 
 //TYPE
-var_type: var_prime | array_type| dynamic_type;
+var_type: var_prime | array_type;
 var_prime: NUMBER | BOOL | STRING;
 dynamic_type: DYNAMIC;
 array_type : LS array_lit RS;
-array_lit: constant COMMA array_lit | constant;
+array_lit: (constant|expr|array_type) COMMA array_lit | constant| expr| array_type|;
 
 
 // LITERAL
@@ -149,7 +149,7 @@ AND: 'and';
 OR:  'or';
 
 //COMMENT
-COMMENT : '##' .*? '\n'-> skip;
+COMMENT: '##' ~[\r\n]* -> skip;
 
 
 //OPERATOR
@@ -173,7 +173,7 @@ RR: ')';
 LS: '[';
 RS: ']';
 COMMA: ',';
-NEWLINE: '\n' | '\r' | '\r\n';
+NEWLINE: '\n' | '\r' | '\r\n' ;
 //IDENTIFIER
 IDENTIFIER : [a-zA-Z_] [0-9a-zA-Z_]*;
 
